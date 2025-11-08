@@ -1,6 +1,6 @@
 {
   "name": "text-purifier",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A TypeScript package to filter and censor bad words",
   "repository": {
     "type": "git",
