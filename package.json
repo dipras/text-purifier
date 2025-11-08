@@ -2,7 +2,14 @@
   "name": "text-purifier",
   "version": "1.0.2",
   "description": "A TypeScript package to filter and censor bad words",
-  "repository": "https://github.com/dipras/text-purifier",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dipras/text-purifier"
+  },
+  "bugs": {
+    "url": "https://github.com/dipras/text-purifier/issues"
+  },
+  "homepage": "https://github.com/dipras/text-purifier#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -21,7 +28,7 @@
     "typescript"
   ],
   "author": "dipras",
-  "license": "MIT",
+  "license": "GPL-2.0-only",
   "files": [
     "dist",
     "config.json"
