@@ -7,6 +7,7 @@ A TypeScript package to filter and censor bad words with support for character m
 - 🚫 Filter and detect bad words in text
 - ⭐ Censorship mode to replace bad words with asterisks
 - 🔄 Character mapping to catch obfuscated words (e.g., "@" → "a", "4" → "a")
+- 🛡️ Whitelisting to prevent false positives
 - ➕ Ability to add custom bad words
 - 🗺️ Extensible character mapping
 - 📝 Written in TypeScript with full type support
@@ -78,6 +79,25 @@ filter.addCharacterMap({
 });
 ```
 
+### Whitelisting
+
+To prevent the filter from flagging legitimate words that may contain a banned word (e.g., "class" containing "ass"), you can use a whitelist.
+
+```typescript
+const filter = createBadWordFilter({
+  banWords: ['ass'],
+  whitelist: ['class', 'assignment'] // These words will not be censored
+});
+
+// "class" and "assignment" will not be censored.
+const result = filter.filterText("The class assignment is important.", true);
+console.log(result);
+// { status: true, result: "The class assignment is important." }
+
+// You can also add words to the whitelist dynamically.
+filter.addWhitelistWords(['classic']);
+```
+
 ### Handle Obfuscated Text
 
 The filter automatically handles obfuscated text using character mapping:
@@ -106,6 +126,7 @@ Creates a new instance of the bad word filter.
 - `config` (optional): Configuration object
   - `banWords`: Array of strings to be banned
   - `characterMap`: Object mapping special characters to their letter equivalents
+  - `whitelist`: Array of strings to be exempt from filtering
 
 #### Returns:
 An object with the following methods:
@@ -132,6 +153,13 @@ Adds new words to the ban list.
 
 #### Parameters:
 - `words`: Array of strings to add to the ban list
+
+### `addWhitelistWords(words: string[])`
+
+Adds new words to the whitelist.
+
+#### Parameters:
+- `words`: Array of strings to add to the whitelist
 
 ### `addCharacterMap(mappings: Record<string, string>)`
 

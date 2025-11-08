@@ -113,4 +113,36 @@ describe('Bad Word Filter', () => {
             });
         });
     });
+
+    describe('Whitelisting', () => {
+        const filter = createBadWordFilter({
+            banWords: ['ass'],
+            whitelist: ['class', 'assignment']
+        });
+
+        test('should not censor whitelisted words', () => {
+            const result = filter.filterText('The class assignment is important.', true);
+            expect(result).toEqual({
+                status: false,
+                result: 'The class assignment is important.'
+            });
+        });
+
+        test('should still censor non-whitelisted bad words', () => {
+            const result = filter.filterText('He is an ass.', true);
+            expect(result).toEqual({
+                status: true,
+                result: 'He is an ***'
+            });
+        });
+
+        test('should allow adding new words to the whitelist dynamically', () => {
+            filter.addWhitelistWords(['classic']);
+            const result = filter.filterText('This is a classic.', true);
+            expect(result).toEqual({
+                status: false,
+                result: 'This is a classic.'
+            });
+        });
+    });
 });

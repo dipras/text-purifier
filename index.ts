@@ -3,6 +3,7 @@ import defaultConfig from "./config.json";
 type FilterConfig = {
     banWords: string[];
     characterMap: Record<string, string>;
+    whitelist: string[];
 }
 
 type FilterBadWordType = {
@@ -14,6 +15,7 @@ interface BadWordFilter {
     filterText: (str: string, censor?: boolean) => FilterBadWordType;
     addBanWords: (words: string[]) => void;
     addCharacterMap: (mappings: Record<string, string>) => void;
+    addWhitelistWords: (words: string[]) => void;
 }
 
 /**
@@ -34,6 +36,7 @@ export const createBadWordFilter = (customConfig?: Partial<FilterConfig>): BadWo
     const config: FilterConfig = {
         banWords: [...defaultConfig.banWords],
         characterMap: { ...defaultConfig.characterMap },
+        whitelist: [],
         ...customConfig
     };
 
@@ -60,7 +63,9 @@ export const createBadWordFilter = (customConfig?: Partial<FilterConfig>): BadWo
         let i = 0;
         let detected = false;
         for(const word of s.split(" ")) {
-            if(config.banWords.some((badWord: string) => word.includes(badWord))) {
+            if (config.whitelist.includes(word)) {
+                newSArr.push(strArr[i]);
+            } else if(config.banWords.some((badWord: string) => word.includes(badWord))) {
                 if(!censor) {
                     return {
                         status: false,
@@ -98,9 +103,18 @@ export const createBadWordFilter = (customConfig?: Partial<FilterConfig>): BadWo
         Object.assign(config.characterMap, mappings);
     };
 
+    /**
+     * Add new words to the whitelist
+     * @param {string[]} words - Array of words to add to whitelist
+     */
+    const addWhitelistWords = (words: string[]): void => {
+        config.whitelist.push(...words.map(w => w.toLowerCase()));
+    };
+
     return {
         filterText,
         addBanWords,
         addCharacterMap,
+        addWhitelistWords,
     };
 }
