@@ -16,7 +16,7 @@ describe('Bad Word Filter', () => {
             const result = filter.filterText('Hello anjing', true);
             expect(result).toEqual({
                 status: true,
-                result: 'Hello *****'
+                result: 'Hello ******'
             });
         });
 
