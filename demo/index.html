@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Purifier Demo</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="flex flex-col max-w-screen-sm mx-auto gap-4">
+        <h1 class="text-center">Text Purifier Demo</h1>
+        
+        <div class="flex flex-col gap-4">
+            <div class="info-box">
+                <p class="mb-2">Text Purifier is a lightweight npm package to filter inappropriate words from your text. Input your text, specify the words you want to filter, and choose whether you want to censor or remove those words.</p>
+                
+                <div class="package-info">
+                    <div class="info-item">
+                        <strong>📦 NPM Package:</strong>
+                        <code>npm install text-purifier</code>
+                        <a href="https://www.npmjs.com/package/text-purifier" target="_blank" class="link">View on NPM</a>
+                    </div>
+                    <div class="info-item">
+                        <strong>🔧 Usage:</strong>
+                        <code>import { createBadWordFilter } from 'text-purifier';</code>
+                    </div>
+                    <div class="info-item">
+                        <strong>📘 Repository:</strong>
+                        <a href="https://github.com/dipras/text-purifier" target="_blank" class="link">GitHub Repository</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col gap-4">
+                <label for="input-custom"><strong>Custom Bad Words</strong></label>
+                <p class="description">Enter the words you want to filter out. For multiple words, separate them with spaces.</p>
+                <div class="example">
+                    Example: stupid ugly bad
+                </div>
+                <textarea rows="3" id="input-custom" placeholder="Enter your words here..."></textarea>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <label for="input-text"><strong>Text to Filter</strong></label>
+                <p class="description">Enter the text you want to filter. All inappropriate words will be processed according to your preference.</p>
+                <div class="example">
+                    Example: You are very stupid and ugly!
+                </div>
+                <textarea rows="4" id="input-text" placeholder="Enter your text here..."></textarea>
+                
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="is-censor">
+                    <label for="is-censor">
+                        <strong>Censor Text?</strong>
+                        <p class="description">When checked, filtered words will be censored (*****). When unchecked, they will be removed entirely.</p>
+                    </label>
+                </div>
+
+                <button id="purifier-btn">Filter Text</button>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <strong>Result:</strong>
+                <div id="result"></div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p>© 2025 Dipras. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="https://github.com/dipras" target="_blank" class="link">GitHub</a> •
+                <a href="https://dipras.my.id" target="_blank" class="link">My Portfolio</a>
+            </div>
+        </footer>
+    </div>
+
+
+    <script type="module">
+        import { createBadWordFilter } from "https://unpkg.com/text-purifier?module";
+        const resEl = document.querySelector("#result");
+        const purifierBtn = document.querySelector("#purifier-btn");
+        const inputText = document.querySelector("#input-text");
+        const customInput = document.querySelector("#input-custom");
+        const censorInp = document.querySelector("#is-censor");
+        
+        purifierBtn.addEventListener("click", () => {
+            const filter = createBadWordFilter();
+            const customBadWords = customInput.value
+                .split(' ')
+                .map(word => word.trim())
+                .filter(word => word.length > 0);
+            
+            filter.addBanWords(customBadWords);
+            const filteredText = filter.filterText(inputText.value, censorInp.checked);
+            resEl.innerText = filteredText.result;
+        })
+    </script>
+</body>
+
+</html>
