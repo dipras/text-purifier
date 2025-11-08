@@ -10,6 +10,12 @@ type FilterBadWordType = {
     result: string;
 }
 
+interface BadWordFilter {
+    filterText: (str: string, censor?: boolean) => FilterBadWordType;
+    addBanWords: (words: string[]) => void;
+    addCharacterMap: (mappings: Record<string, string>) => void;
+}
+
 /**
  * Create a new bad word filter instance with custom configuration
  * @param {FilterConfig} config - Custom configuration for the filter
@@ -24,7 +30,7 @@ type FilterBadWordType = {
  * // Use the filter
  * filter.filterText("b@d w0rd$");
  */
-export const createBadWordFilter = (customConfig?: Partial<FilterConfig>) => {
+export const createBadWordFilter = (customConfig?: Partial<FilterConfig>): BadWordFilter => {
     const config: FilterConfig = {
         banWords: [...defaultConfig.banWords],
         characterMap: { ...defaultConfig.characterMap },
