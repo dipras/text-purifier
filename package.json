@@ -1,12 +1,30 @@
 {
   "name": "bad-word-filter",
-  "module": "index.ts",
+  "version": "1.0.0",
+  "description": "A TypeScript package to filter and censor bad words",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
-  "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
+  "private": false,
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
   },
-  "peerDependencies": {
-    "typescript": "^5"
+  "keywords": [
+    "filter",
+    "bad-words",
+    "censor",
+    "profanity",
+    "typescript"
+  ],
+  "author": "dipras",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "config.json"
+  ],
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/node": "latest"
   }
 }

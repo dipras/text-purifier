@@ -5,7 +5,23 @@ type filterBadWordType = {
     result: string;
 }
 
-const filtergBadWord = (str: string, censor = false): filterBadWordType => {
+/**
+ * Filter and detect bad words in a string
+ * @param {string} str - The input string to check for bad words
+ * @param {boolean} [censor=false] - If true, replaces bad words with asterisks. If false, returns error message when bad word is detected
+ * @returns {filterBadWordType} An object containing:
+ *   - status: false if bad word detected (when censor=false), true if bad word found and censored (when censor=true)
+ *   - result: censored string if censor=true, or "Ban word detected!" message if censor=false
+ * @example
+ * // Without censoring (returns immediately when bad word found)
+ * filtergBadWord("Hello anjing", false)
+ * // Returns: { status: false, result: "Ban word detected!" }
+ * 
+ * // With censoring (replaces bad words with asterisks)
+ * filtergBadWord("Hello anjing", true)
+ * // Returns: { status: true, result: "Hello *****" }
+ */
+export const filtergBadWord = (str: string, censor = false): filterBadWordType => {
     let s = str.toLowerCase();
 
     s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -43,5 +59,3 @@ const filtergBadWord = (str: string, censor = false): filterBadWordType => {
         result: newSArr.join(" ")
     }
 }
-
-console.log(filtergBadWord("Asu De Kontol, sama lo semua, ngentot, ngentot, sama lo semua, Asu De Kontol, sama lo Semua Ngentod, Ngentod, sama lo semua", true))
