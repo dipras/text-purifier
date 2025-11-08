@@ -1,7 +1,8 @@
 {
-  "name": "bad-word-filter",
-  "version": "1.0.0",
+  "name": "text-purifier",
+  "version": "1.0.1",
   "description": "A TypeScript package to filter and censor bad words",
+  "repository": "https://github.com/dipras/text-purifier",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",

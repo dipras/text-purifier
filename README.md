@@ -1,4 +1,4 @@
-# Bad Word Filter
+# Text Purifier
 
 A TypeScript package to filter and censor bad words with support for character mapping and custom word lists. Supports both Bahasa Indonesia and English bad words detection.
 
