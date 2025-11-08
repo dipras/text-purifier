@@ -1,6 +1,6 @@
 {
   "name": "text-purifier",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A TypeScript package to filter and censor bad words",
   "repository": "https://github.com/dipras/text-purifier",
   "main": "dist/index.js",
@@ -8,8 +8,8 @@
   "type": "module",
   "private": false,
   "scripts": {
-    "build": "tsc",
-    "prepare": "npm run build",
+    "build": "rollup -c",
+    "prepare": "bun run build",
     "test": "jest",
     "test:watch": "jest --watch"
   },
@@ -27,10 +27,15 @@
     "config.json"
   ],
   "devDependencies": {
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-typescript": "^12.3.0",
     "@types/jest": "^30.0.0",
     "@types/node": "latest",
     "jest": "^30.2.0",
+    "rollup": "^4.53.1",
+    "rollup-plugin-dts": "^6.2.3",
     "ts-jest": "^29.4.5",
+    "tslib": "^2.8.1",
     "typescript": "^5"
   }
 }
