@@ -1,6 +1,6 @@
 {
   "name": "text-purifier",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A TypeScript package to filter and censor bad words",
   "repository": {
     "type": "git",
@@ -16,7 +16,7 @@
   "private": false,
   "scripts": {
     "build": "rollup -c",
-    "prepare": "bun run build",
+    "prepare": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch"
   },
