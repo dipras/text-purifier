@@ -36,7 +36,7 @@
             
             <div class="flex flex-col gap-4">
                 <label for="input-custom"><strong>Custom Bad Words</strong></label>
-                <p class="description">Enter the words you want to filter out. For multiple words, separate them with spaces.</p>
+                <p class="description">Enter exact words to detect. For multiple words, separate them with spaces.</p>
                 <div class="example">
                     Example: stupid ugly bad
                 </div>
@@ -55,7 +55,7 @@
                     <input type="checkbox" id="is-censor">
                     <label for="is-censor">
                         <strong>Censor Text?</strong>
-                        <p class="description">When checked, filtered words will be censored (*****). When unchecked, they will be removed entirely.</p>
+                        <p class="description">When checked, detected words are censored (*****). When unchecked, the demo reports that a banned word was detected.</p>
                     </label>
                 </div>
 
@@ -95,7 +95,9 @@
             
             filter.addBanWords(customBadWords);
             const filteredText = filter.filterText(inputText.value, censorInp.checked);
-            resEl.innerText = filteredText.result;
+            resEl.innerText = filteredText.detected
+                ? filteredText.result
+                : "No banned words detected.";
         })
     </script>
 </body>

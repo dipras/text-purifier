@@ -1,114 +1,268 @@
 import defaultConfig from "./config.json";
 
-type FilterConfig = {
+export type MatchMode = "exact" | "substring";
+
+export type FilterConfig = {
     banWords: string[];
     characterMap: Record<string, string>;
     whitelist: string[];
-}
+    matchMode: MatchMode;
+    censorCharacter: string;
+};
 
-type FilterBadWordType = {
+export type FilterMatch = {
+    word: string;
+    normalized: string;
+    start: number;
+    end: number;
+};
+
+export type FilterBadWordResult = {
+    /**
+     * @deprecated Use `detected` instead. This field preserves the v1 behavior:
+     * it is true only when censoring was requested and text was censored.
+     */
     status: boolean;
+    detected: boolean;
     result: string;
-}
+    matches: FilterMatch[];
+};
 
-interface BadWordFilter {
-    filterText: (str: string, censor?: boolean) => FilterBadWordType;
+export interface BadWordFilter {
+    filterText: (str: string, censor?: boolean) => FilterBadWordResult;
     addBanWords: (words: string[]) => void;
     addCharacterMap: (mappings: Record<string, string>) => void;
     addWhitelistWords: (words: string[]) => void;
 }
 
+type NormalizedToken = {
+    value: string;
+    contentStart: number;
+    contentEnd: number;
+};
+
+const combiningMarks = /[\u0300-\u036f]/g;
+const lettersAndNumbers = /[\p{L}\p{N}]/u;
+const nonWhitespaceToken = /\S+/gu;
+
+const normalizeCharacters = (value: string): string =>
+    value.toLowerCase().normalize("NFD").replace(combiningMarks, "");
+
+const normalizeCharacterMap = (
+    mappings: Record<string, string>
+): Record<string, string> =>
+    Object.entries(mappings).reduce<Record<string, string>>(
+        (normalized, [character, replacement]) => {
+            normalized[normalizeCharacters(character)] =
+                normalizeCharacters(replacement);
+            return normalized;
+        },
+        {}
+    );
+
+const normalizeDictionaryWord = (
+    value: string,
+    characterMap: Record<string, string>
+): string => {
+    const normalized = normalizeCharacters(value);
+
+    return Array.from(normalized, (character) => {
+        return characterMap[character] ?? character;
+    })
+        .join("")
+        .replace(/[^\p{L}\p{N}]/gu, "");
+};
+
 /**
- * Create a new bad word filter instance with custom configuration
- * @param {FilterConfig} config - Custom configuration for the filter
- * @returns {Object} Filter instance with filterText method
- * @example
- * // Create filter with custom configuration
- * const filter = createBadWordFilter({
- *   banWords: ['bad', 'words'],
- *   characterMap: { '@': 'a', '4': 'a', '$': 's' }
- * });
- * 
- * // Use the filter
- * filter.filterText("b@d w0rd$");
+ * Produce two candidates for a token:
+ * - punctuation at the edges is ignored, so `bad!!!` normalizes to `bad`
+ * - all aliases are mapped, so `$hit` can normalize to `shit`
+ *
+ * Internal separators are removed in both candidates, allowing forms such as
+ * `b-a-d` while offsets continue to point at the original text.
  */
-export const createBadWordFilter = (customConfig?: Partial<FilterConfig>): BadWordFilter => {
-    const config: FilterConfig = {
-        banWords: [...defaultConfig.banWords],
-        characterMap: { ...defaultConfig.characterMap },
-        whitelist: [],
-        ...customConfig
-    };
+const normalizeToken = (
+    token: string,
+    characterMap: Record<string, string>
+): NormalizedToken[] => {
+    const characters = Array.from(token);
+    const normalizedCharacters = characters.map(normalizeCharacters);
+    const isLetterOrNumber = normalizedCharacters.map((character) =>
+        lettersAndNumbers.test(character)
+    );
 
-    /**
-     * Filter and detect bad words in a string
-     * @param {string} str - The input string to check for bad words
-     * @param {boolean} [censor=false] - If true, replaces bad words with asterisks. If false, returns error message when bad word is detected
-     * @returns {FilterBadWordType} An object containing:
-     *   - status: false if bad word detected (when censor=false), true if bad word found and censored (when censor=true)
-     *   - result: censored string if censor=true, or "Ban word detected!" message if censor=false
-     */
-    const filterText = (str: string, censor = false): FilterBadWordType => {
-        let s = str.toLowerCase();
-        s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const firstContent = isLetterOrNumber.indexOf(true);
+    const lastContent = isLetterOrNumber.lastIndexOf(true);
 
-        let mapAliasCharacter = s.split('').map((chara: string) => {
-            return config.characterMap[chara] ?? chara;
+    if (firstContent === -1) {
+        return [];
+    }
+
+    const buildCandidate = (mapEdgeAliases: boolean): NormalizedToken => {
+        let value = "";
+
+        normalizedCharacters.forEach((character, index) => {
+            const isEdge = index < firstContent || index > lastContent;
+            if (isEdge && !mapEdgeAliases) {
+                return;
+            }
+
+            const mapped = characterMap[character] ?? character;
+            value += mapped.replace(/[^\p{L}\p{N}]/gu, "");
         });
 
-        s = mapAliasCharacter.join('').replace(/[^a-z\s]/g, '');
-
-        const strArr = str.split(" ");
-        const newSArr = [];
-        let i = 0;
-        let detected = false;
-        for(const word of s.split(" ")) {
-            if (config.whitelist.includes(word)) {
-                newSArr.push(strArr[i]);
-            } else if(config.banWords.some((badWord: string) => word.includes(badWord))) {
-                if(!censor) {
-                    return {
-                        status: false,
-                        result: "Ban word detected!"
-                    }
-                } else {
-                    detected = true;
-                    newSArr.push("*".repeat(word.length));
-                }
-            } else {
-                newSArr.push(strArr[i]);
-            }
-            i++;
-        }
-        
         return {
-            status: detected,
-            result: newSArr.join(" ")
+            value,
+            contentStart: mapEdgeAliases ? 0 : firstContent,
+            contentEnd: mapEdgeAliases ? characters.length : lastContent + 1,
+        };
+    };
+
+    const candidates = [buildCandidate(false), buildCandidate(true)];
+
+    return candidates.filter(
+        (candidate, index) =>
+            candidate.value.length > 0 &&
+            candidates.findIndex((item) => item.value === candidate.value) === index
+    );
+};
+
+const matchesBannedWord = (
+    candidate: string,
+    banWords: string[],
+    matchMode: MatchMode
+): boolean => {
+    if (matchMode === "substring") {
+        return banWords.some((badWord) => candidate.includes(badWord));
+    }
+
+    return banWords.includes(candidate);
+};
+
+/**
+ * Create an isolated bad-word filter instance.
+ */
+export const createBadWordFilter = (
+    customConfig?: Partial<FilterConfig>
+): BadWordFilter => {
+    const characterMap = normalizeCharacterMap(
+        customConfig?.characterMap ?? defaultConfig.characterMap
+    );
+
+    const config: FilterConfig = {
+        banWords: [...(customConfig?.banWords ?? defaultConfig.banWords)],
+        characterMap,
+        whitelist: [...(customConfig?.whitelist ?? [])],
+        matchMode: customConfig?.matchMode ?? "exact",
+        censorCharacter: customConfig?.censorCharacter ?? "*",
+    };
+
+    if (Array.from(config.censorCharacter).length !== 1) {
+        throw new TypeError("censorCharacter must contain exactly one character");
+    }
+
+    const normalizeWordList = (words: string[]): string[] =>
+        Array.from(
+            new Set(
+                words
+                    .map((word) =>
+                        normalizeDictionaryWord(word, config.characterMap)
+                    )
+                    .filter(Boolean)
+            )
+        );
+
+    let normalizedBanWords = normalizeWordList(config.banWords);
+    let normalizedWhitelist = normalizeWordList(config.whitelist);
+
+    const filterText = (
+        str: string,
+        censor = false
+    ): FilterBadWordResult => {
+        const matches: FilterMatch[] = [];
+        let censoredResult = "";
+        let previousEnd = 0;
+
+        for (const tokenMatch of str.matchAll(nonWhitespaceToken)) {
+            const token = tokenMatch[0];
+            const tokenStart = tokenMatch.index;
+            const candidates = normalizeToken(token, config.characterMap);
+            const candidate = candidates.find(
+                ({ value }) =>
+                    !normalizedWhitelist.includes(value) &&
+                    matchesBannedWord(
+                        value,
+                        normalizedBanWords,
+                        config.matchMode
+                    )
+            );
+
+            if (!candidate) {
+                continue;
+            }
+
+            const prefixLength = Array.from(token)
+                .slice(0, candidate.contentStart)
+                .join("").length;
+            const contentLength = Array.from(token)
+                .slice(candidate.contentStart, candidate.contentEnd)
+                .join("").length;
+            const start = tokenStart + prefixLength;
+            const end = start + contentLength;
+
+            matches.push({
+                word: str.slice(start, end),
+                normalized: candidate.value,
+                start,
+                end,
+            });
+
+            if (censor) {
+                censoredResult += str.slice(previousEnd, start);
+                censoredResult += config.censorCharacter.repeat(
+                    Array.from(candidate.value).length
+                );
+                previousEnd = end;
+            }
         }
+
+        const detected = matches.length > 0;
+
+        if (!censor && detected) {
+            return {
+                status: false,
+                detected,
+                result: "Ban word detected!",
+                matches,
+            };
+        }
+
+        if (censor && detected) {
+            censoredResult += str.slice(previousEnd);
+        }
+
+        return {
+            status: censor && detected,
+            detected,
+            result: censor && detected ? censoredResult : str,
+            matches,
+        };
     };
 
-    /**
-     * Add new words to the ban list
-     * @param {string[]} words - Array of words to add to ban list
-     */
     const addBanWords = (words: string[]): void => {
-        config.banWords.push(...words.map(w => w.toLowerCase()));
+        config.banWords.push(...words);
+        normalizedBanWords = normalizeWordList(config.banWords);
     };
 
-    /**
-     * Add new character mappings
-     * @param {Record<string, string>} mappings - Object with character mappings
-     */
     const addCharacterMap = (mappings: Record<string, string>): void => {
-        Object.assign(config.characterMap, mappings);
+        Object.assign(config.characterMap, normalizeCharacterMap(mappings));
+        normalizedBanWords = normalizeWordList(config.banWords);
+        normalizedWhitelist = normalizeWordList(config.whitelist);
     };
 
-    /**
-     * Add new words to the whitelist
-     * @param {string[]} words - Array of words to add to whitelist
-     */
     const addWhitelistWords = (words: string[]): void => {
-        config.whitelist.push(...words.map(w => w.toLowerCase()));
+        config.whitelist.push(...words);
+        normalizedWhitelist = normalizeWordList(config.whitelist);
     };
 
     return {
@@ -117,4 +271,4 @@ export const createBadWordFilter = (customConfig?: Partial<FilterConfig>): BadWo
         addCharacterMap,
         addWhitelistWords,
     };
-}
+};

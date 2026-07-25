@@ -1,173 +1,161 @@
 # Text Purifier
 
-A TypeScript package to filter and censor bad words with support for character mapping and custom word lists. Supports both Bahasa Indonesia and English bad words detection.
+A small TypeScript library for detecting and censoring words with configurable
+word lists, character aliases, whitelisting, and match metadata.
 
 ## Features
 
-- 🚫 Filter and detect bad words in text
-- ⭐ Censorship mode to replace bad words with asterisks
-- 🔄 Character mapping to catch obfuscated words (e.g., "@" → "a", "4" → "a")
-- 🛡️ Whitelisting to prevent false positives
-- ➕ Ability to add custom bad words
-- 🗺️ Extensible character mapping
-- 📝 Written in TypeScript with full type support
-- 🌐 Supports both Bahasa Indonesia and English
+- Exact-word matching by default to reduce false positives
+- Optional substring matching
+- Character aliases such as `@` → `a` and `0` → `o`
+- Detection of separated forms such as `b-a-d`
+- Preserves whitespace, newlines, and surrounding punctuation
+- Match offsets against the original input
+- Custom censor character and runtime configuration
+- TypeScript declarations, ESM, and browser UMD builds
 
 ## Installation
 
 ```bash
-npm install bad-word-filter
-# or
-yarn add bad-word-filter
+npm install text-purifier
 ```
 
-## Usage
+## Upgrading from v1
 
-### Basic Usage
+Version 2 uses exact-word matching by default. To retain v1 substring matching,
+set `matchMode: "substring"`. The legacy `status` field remains available, but
+new code should use `detected`.
+
+## Basic usage
 
 ```typescript
-import { createBadWordFilter } from 'bad-word-filter';
+import { createBadWordFilter } from "text-purifier";
 
-// Create a filter instance with default configuration
 const filter = createBadWordFilter();
 
-// Check for bad words (returns error message if found)
-const result1 = filter.filterText("This is a bad text");
-console.log(result1);
-// { status: false, result: "Ban word detected!" }
+const detection = filter.filterText("Hello anjing");
+console.log(detection.detected); // true
+console.log(detection.result); // "Ban word detected!"
 
-// Censor bad words (replaces them with asterisks)
-const result2 = filter.filterText("This is a bad text", true);
-console.log(result2);
-// { status: true, result: "This is a *** text" }
+const censored = filter.filterText("Hello anjing!", true);
+console.log(censored.result); // "Hello ******!"
 ```
 
-### Custom Configuration
+## Result
 
-You can create a filter with custom configuration:
+`filterText()` returns:
 
-```typescript
-const filter = createBadWordFilter({
-  banWords: ['custom', 'bad', 'words'],
-  characterMap: {
-    '@': 'a',
-    '4': 'a',
-    '$': 's',
-    '0': 'o'
-  }
-});
-```
-
-### Adding Bad Words
-
-```typescript
-const filter = createBadWordFilter();
-
-// Add more words to the ban list
-filter.addBanWords(['word1', 'word2']);
-```
-
-### Adding Character Mappings
-
-```typescript
-const filter = createBadWordFilter();
-
-// Add more character mappings
-filter.addCharacterMap({
-  '!': 'i',
-  '3': 'e'
-});
-```
-
-### Whitelisting
-
-To prevent the filter from flagging legitimate words that may contain a banned word (e.g., "class" containing "ass"), you can use a whitelist.
-
-```typescript
-const filter = createBadWordFilter({
-  banWords: ['ass'],
-  whitelist: ['class', 'assignment'] // These words will not be censored
-});
-
-// "class" and "assignment" will not be censored.
-const result = filter.filterText("The class assignment is important.", true);
-console.log(result);
-// { status: true, result: "The class assignment is important." }
-
-// You can also add words to the whitelist dynamically.
-filter.addWhitelistWords(['classic']);
-```
-
-### Handle Obfuscated Text
-
-The filter automatically handles obfuscated text using character mapping:
-
-```typescript
-const filter = createBadWordFilter();
-
-// Will detect "b@d" as "bad"
-const result = filter.filterText("This is b@d");
-console.log(result);
-// { status: false, result: "Ban word detected!" }
-
-// With censorship enabled
-const censored = filter.filterText("This is b@d", true);
-console.log(censored);
-// { status: true, result: "This is ***" }
-```
-
-## API Reference
-
-### `createBadWordFilter(config?: Partial<FilterConfig>)`
-
-Creates a new instance of the bad word filter.
-
-#### Parameters:
-- `config` (optional): Configuration object
-  - `banWords`: Array of strings to be banned
-  - `characterMap`: Object mapping special characters to their letter equivalents
-  - `whitelist`: Array of strings to be exempt from filtering
-
-#### Returns:
-An object with the following methods:
-
-### `filterText(str: string, censor?: boolean)`
-
-Filters text for bad words.
-
-#### Parameters:
-- `str`: The input string to check
-- `censor` (optional): If true, replaces bad words with asterisks. If false, returns error message when bad word is detected
-
-#### Returns:
 ```typescript
 {
-  status: boolean;  // false if bad word detected (when censor=false), true if word found and censored (when censor=true)
-  result: string;   // censored string or error message
+  detected: true,
+  result: "Hello ******!",
+  matches: [
+    {
+      word: "anjing",
+      normalized: "anjing",
+      start: 6,
+      end: 12
+    }
+  ],
+  status: true
 }
 ```
 
-### `addBanWords(words: string[])`
+Use `detected` to determine whether a banned word was found. `status` remains
+available for compatibility with v1 and is true only when censoring was
+requested and text was changed.
 
-Adds new words to the ban list.
+## Configuration
 
-#### Parameters:
-- `words`: Array of strings to add to the ban list
+```typescript
+const filter = createBadWordFilter({
+  banWords: ["bad", "word"],
+  whitelist: ["allowed"],
+  characterMap: {
+    "@": "a",
+    "4": "a",
+    "$": "s",
+    "0": "o"
+  },
+  matchMode: "exact",
+  censorCharacter: "*"
+});
+```
 
-### `addWhitelistWords(words: string[])`
+Providing `banWords` or `characterMap` replaces the corresponding default
+value for that filter instance. Configuration objects are cloned, so runtime
+updates do not mutate the values supplied by the caller.
 
-Adds new words to the whitelist.
+### Match modes
 
-#### Parameters:
-- `words`: Array of strings to add to the whitelist
+The default `exact` mode avoids matching a banned word inside an otherwise
+valid word:
 
-### `addCharacterMap(mappings: Record<string, string>)`
+```typescript
+const filter = createBadWordFilter({ banWords: ["ass"] });
+filter.filterText("classic", true).detected; // false
+```
 
-Adds new character mappings.
+The previous substring behavior is available explicitly:
 
-#### Parameters:
-- `mappings`: Object with character mappings
+```typescript
+const filter = createBadWordFilter({
+  banWords: ["ass"],
+  matchMode: "substring"
+});
+
+filter.filterText("classic", true).detected; // true
+```
+
+### Runtime updates
+
+```typescript
+const filter = createBadWordFilter();
+
+filter.addBanWords(["custom"]);
+filter.addWhitelistWords(["allowed"]);
+filter.addCharacterMap({ "3": "e" });
+```
+
+## API
+
+### `createBadWordFilter(config?)`
+
+Creates an isolated filter. Available configuration:
+
+- `banWords: string[]`
+- `characterMap: Record<string, string>`
+- `whitelist: string[]`
+- `matchMode: "exact" | "substring"`
+- `censorCharacter: string` — exactly one Unicode code point
+
+### `filterText(text, censor?)`
+
+Detects banned words. With `censor: true`, matched content is replaced while
+the surrounding text formatting is preserved.
+
+### `addBanWords(words)`
+
+Adds words to the current filter instance.
+
+### `addWhitelistWords(words)`
+
+Adds exact normalized words that should not be matched.
+
+### `addCharacterMap(mappings)`
+
+Adds or replaces character aliases and rebuilds the normalized word lists.
+
+## Development
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
+The test scripts use [Bun](https://bun.sh/) 1.3.5.
 
 ## License
 
-This project is licensed under [GPLv2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html).
+[GPL-2.0-only](LICENSE)
