@@ -1,5 +1,6 @@
 # Text Purifier
 
+![Text Purifier](featured.png)
 A small TypeScript library for detecting and censoring words with configurable
 word lists, character aliases, whitelisting, and match metadata.
 
