@@ -56,6 +56,15 @@ describe("createBadWordFilter", () => {
         expect(result.result).toBe("****** *******");
     });
 
+    test("loads expanded words from both language dictionaries", () => {
+        const result = createBadWordFilter().filterText(
+            "fuck goblok",
+            true
+        );
+
+        expect(result.result).toBe("**** ******");
+    });
+
     test("can load selected language dictionaries", () => {
         const indonesianFilter = createBadWordFilter({ languages: ["id"] });
         const englishFilter = createBadWordFilter({ languages: ["en"] });
