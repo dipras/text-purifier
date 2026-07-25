@@ -1,5 +1,7 @@
 import {
     createBadWordFilter,
+    createFilter,
+    createTextPurifier,
     type FilterBadWordResult,
 } from "./index";
 
@@ -251,4 +253,63 @@ describe("createBadWordFilter", () => {
             );
         }
     );
+});
+
+describe("createTextPurifier", () => {
+    test("detect returns an unambiguous detection result", () => {
+        expect(createTextPurifier().detect("Hello anjing!")).toEqual({
+            detected: true,
+            matches: [
+                {
+                    word: "anjing",
+                    normalized: "anjing",
+                    start: 6,
+                    end: 12,
+                },
+            ],
+        });
+    });
+
+    test("censor returns censoredText for matching and clean input", () => {
+        const purifier = createTextPurifier();
+
+        expect(purifier.censor("Hello anjing!")).toEqual({
+            detected: true,
+            censoredText: "Hello ******!",
+            matches: [
+                {
+                    word: "anjing",
+                    normalized: "anjing",
+                    start: 6,
+                    end: 12,
+                },
+            ],
+        });
+        expect(purifier.censor("Hello world!")).toEqual({
+            detected: false,
+            censoredText: "Hello world!",
+            matches: [],
+        });
+    });
+
+    test("exports createFilter as a short alias", () => {
+        expect(createFilter({ banWords: ["bad"] }).detect("bad").detected).toBe(
+            true
+        );
+    });
+
+    test("keeps the deprecated API compatible", () => {
+        const purifier = createBadWordFilter({ banWords: ["bad"] });
+
+        expect(purifier.filterText("bad")).toMatchObject({
+            status: false,
+            detected: true,
+            result: "Ban word detected!",
+        });
+        expect(purifier.filterText("bad", true)).toMatchObject({
+            status: true,
+            detected: true,
+            result: "***",
+        });
+    });
 });

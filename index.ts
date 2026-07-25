@@ -8,7 +8,7 @@ export const supportedLanguages = ["en", "id"] as const;
 
 export type SupportedLanguage = (typeof supportedLanguages)[number];
 
-export type FilterConfig = {
+export type TextPurifierConfig = {
     banWords: string[];
     languages: SupportedLanguage[];
     excludeLanguages: SupportedLanguage[];
@@ -18,13 +18,35 @@ export type FilterConfig = {
     censorCharacter: string;
 };
 
-export type FilterMatch = {
+/**
+ * @deprecated Use `TextPurifierConfig` instead.
+ */
+export type FilterConfig = TextPurifierConfig;
+
+export type TextPurifierMatch = {
     word: string;
     normalized: string;
     start: number;
     end: number;
 };
 
+/**
+ * @deprecated Use `TextPurifierMatch` instead.
+ */
+export type FilterMatch = TextPurifierMatch;
+
+export type DetectionResult = {
+    detected: boolean;
+    matches: TextPurifierMatch[];
+};
+
+export type CensorResult = DetectionResult & {
+    censoredText: string;
+};
+
+/**
+ * @deprecated Use `DetectionResult` or `CensorResult` instead.
+ */
 export type FilterBadWordResult = {
     /**
      * @deprecated Use `detected` instead. This field preserves the v1 behavior:
@@ -33,15 +55,25 @@ export type FilterBadWordResult = {
     status: boolean;
     detected: boolean;
     result: string;
-    matches: FilterMatch[];
+    matches: TextPurifierMatch[];
 };
 
-export interface BadWordFilter {
+export interface TextPurifier {
+    detect: (text: string) => DetectionResult;
+    censor: (text: string) => CensorResult;
+    /**
+     * @deprecated Use `detect(text)` or `censor(text)` instead.
+     */
     filterText: (str: string, censor?: boolean) => FilterBadWordResult;
     addBanWords: (words: string[]) => void;
     addCharacterMap: (mappings: Record<string, string>) => void;
     addWhitelistWords: (words: string[]) => void;
 }
+
+/**
+ * @deprecated Use `TextPurifier` instead.
+ */
+export type BadWordFilter = TextPurifier;
 
 type NormalizedToken = {
     value: string;
@@ -50,6 +82,7 @@ type NormalizedToken = {
 };
 
 const combiningMarks = /[\u0300-\u036f]/g;
+const asciiLettersAndNumbersOnly = /^[A-Za-z0-9]+$/;
 const lettersAndNumbers = /[\p{L}\p{N}]/u;
 const nonWhitespaceToken = /\S+/gu;
 
@@ -98,6 +131,23 @@ const normalizeToken = (
     token: string,
     characterMap: Record<string, string>
 ): NormalizedToken[] => {
+    if (asciiLettersAndNumbersOnly.test(token)) {
+        let value = "";
+
+        for (let index = 0; index < token.length; index += 1) {
+            const character = token[index].toLowerCase();
+            value += characterMap[character] ?? character;
+        }
+
+        return [
+            {
+                value: value.replace(/[^\p{L}\p{N}]/gu, ""),
+                contentStart: 0,
+                contentEnd: token.length,
+            },
+        ];
+    }
+
     const characters = Array.from(token);
     const normalizedCharacters = characters.map(normalizeCharacters);
     const isLetterOrNumber = normalizedCharacters.map((character) =>
@@ -143,21 +193,22 @@ const normalizeToken = (
 const matchesBannedWord = (
     candidate: string,
     banWords: string[],
+    exactBanWords: Set<string>,
     matchMode: MatchMode
 ): boolean => {
     if (matchMode === "substring") {
         return banWords.some((badWord) => candidate.includes(badWord));
     }
 
-    return banWords.includes(candidate);
+    return exactBanWords.has(candidate);
 };
 
 /**
- * Create an isolated bad-word filter instance.
+ * Create an isolated text purifier instance.
  */
-export const createBadWordFilter = (
-    customConfig?: Partial<FilterConfig>
-): BadWordFilter => {
+export const createTextPurifier = (
+    customConfig?: Partial<TextPurifierConfig>
+): TextPurifier => {
     const excludedLanguages = new Set(customConfig?.excludeLanguages ?? []);
     const languages = (
         customConfig?.languages ?? [...supportedLanguages]
@@ -169,7 +220,7 @@ export const createBadWordFilter = (
         customConfig?.characterMap ?? defaultConfig.characterMap
     );
 
-    const config: FilterConfig = {
+    const config: TextPurifierConfig = {
         banWords: [...(customConfig?.banWords ?? languageBanWords)],
         languages: [...languages],
         excludeLanguages: [...excludedLanguages],
@@ -195,15 +246,12 @@ export const createBadWordFilter = (
         );
 
     let normalizedBanWords = normalizeWordList(config.banWords);
+    let normalizedBanWordSet = new Set(normalizedBanWords);
     let normalizedWhitelist = normalizeWordList(config.whitelist);
+    let normalizedWhitelistSet = new Set(normalizedWhitelist);
 
-    const filterText = (
-        str: string,
-        censor = false
-    ): FilterBadWordResult => {
-        const matches: FilterMatch[] = [];
-        let censoredResult = "";
-        let previousEnd = 0;
+    const findMatches = (str: string): TextPurifierMatch[] => {
+        const matches: TextPurifierMatch[] = [];
 
         for (const tokenMatch of str.matchAll(nonWhitespaceToken)) {
             const token = tokenMatch[0];
@@ -211,10 +259,11 @@ export const createBadWordFilter = (
             const candidates = normalizeToken(token, config.characterMap);
             const candidate = candidates.find(
                 ({ value }) =>
-                    !normalizedWhitelist.includes(value) &&
+                    !normalizedWhitelistSet.has(value) &&
                     matchesBannedWord(
                         value,
                         normalizedBanWords,
+                        normalizedBanWordSet,
                         config.matchMode
                     )
             );
@@ -238,35 +287,67 @@ export const createBadWordFilter = (
                 start,
                 end,
             });
-
-            if (censor) {
-                censoredResult += str.slice(previousEnd, start);
-                censoredResult += config.censorCharacter.repeat(
-                    Array.from(candidate.value).length
-                );
-                previousEnd = end;
-            }
         }
 
-        const detected = matches.length > 0;
+        return matches;
+    };
 
-        if (!censor && detected) {
-            return {
-                status: false,
-                detected,
-                result: "Ban word detected!",
-                matches,
-            };
+    const censorMatches = (
+        str: string,
+        matches: TextPurifierMatch[]
+    ): string => {
+        if (matches.length === 0) {
+            return str;
         }
 
-        if (censor && detected) {
-            censoredResult += str.slice(previousEnd);
+        let censoredText = "";
+        let previousEnd = 0;
+
+        for (const match of matches) {
+            censoredText += str.slice(previousEnd, match.start);
+            censoredText += config.censorCharacter.repeat(
+                Array.from(match.normalized).length
+            );
+            previousEnd = match.end;
         }
+
+        return censoredText + str.slice(previousEnd);
+    };
+
+    const detect = (text: string): DetectionResult => {
+        const matches = findMatches(text);
 
         return {
-            status: censor && detected,
+            detected: matches.length > 0,
+            matches,
+        };
+    };
+
+    const censor = (text: string): CensorResult => {
+        const matches = findMatches(text);
+
+        return {
+            detected: matches.length > 0,
+            censoredText: censorMatches(text, matches),
+            matches,
+        };
+    };
+
+    const filterText = (
+        str: string,
+        shouldCensor = false
+    ): FilterBadWordResult => {
+        const matches = findMatches(str);
+        const detected = matches.length > 0;
+
+        return {
+            status: shouldCensor && detected,
             detected,
-            result: censor && detected ? censoredResult : str,
+            result: shouldCensor
+                ? censorMatches(str, matches)
+                : detected
+                  ? "Ban word detected!"
+                  : str,
             matches,
         };
     };
@@ -274,23 +355,39 @@ export const createBadWordFilter = (
     const addBanWords = (words: string[]): void => {
         config.banWords.push(...words);
         normalizedBanWords = normalizeWordList(config.banWords);
+        normalizedBanWordSet = new Set(normalizedBanWords);
     };
 
     const addCharacterMap = (mappings: Record<string, string>): void => {
         Object.assign(config.characterMap, normalizeCharacterMap(mappings));
         normalizedBanWords = normalizeWordList(config.banWords);
+        normalizedBanWordSet = new Set(normalizedBanWords);
         normalizedWhitelist = normalizeWordList(config.whitelist);
+        normalizedWhitelistSet = new Set(normalizedWhitelist);
     };
 
     const addWhitelistWords = (words: string[]): void => {
         config.whitelist.push(...words);
         normalizedWhitelist = normalizeWordList(config.whitelist);
+        normalizedWhitelistSet = new Set(normalizedWhitelist);
     };
 
     return {
+        detect,
+        censor,
         filterText,
         addBanWords,
         addCharacterMap,
         addWhitelistWords,
     };
 };
+
+/**
+ * Short alias for `createTextPurifier`.
+ */
+export const createFilter = createTextPurifier;
+
+/**
+ * @deprecated Use `createTextPurifier()` instead.
+ */
+export const createBadWordFilter = createTextPurifier;
