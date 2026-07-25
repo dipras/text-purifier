@@ -1,5 +1,13 @@
+import { rmSync } from 'node:fs';
 import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
+
+const cleanDist = {
+  name: 'clean-dist',
+  buildStart() {
+    rmSync('dist', { recursive: true, force: true });
+  },
+};
 
 export default {
   input: 'index.ts',
@@ -17,6 +25,7 @@ export default {
     }
   ],
   plugins: [
+    cleanDist,
     typescript({ tsconfig: './tsconfig.json' }),
     json()
   ]

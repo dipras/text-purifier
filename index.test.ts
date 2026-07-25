@@ -68,6 +68,27 @@ describe("createBadWordFilter", () => {
         );
     });
 
+    test("can exclude language dictionaries", () => {
+        const filter = createBadWordFilter({
+            excludeLanguages: ["en"],
+        });
+
+        expect(filter.filterText("anjing bastard", true).result).toBe(
+            "****** bastard"
+        );
+    });
+
+    test("excluded languages take precedence over selected languages", () => {
+        const filter = createBadWordFilter({
+            languages: ["id", "en"],
+            excludeLanguages: ["id"],
+        });
+
+        expect(filter.filterText("anjing bastard", true).result).toBe(
+            "anjing *******"
+        );
+    });
+
     test("returns the original clean text", () => {
         expect(createBadWordFilter().filterText("Hello world")).toEqual(
             cleanResult("Hello world")

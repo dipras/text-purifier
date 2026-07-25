@@ -11,6 +11,7 @@ export type SupportedLanguage = (typeof supportedLanguages)[number];
 export type FilterConfig = {
     banWords: string[];
     languages: SupportedLanguage[];
+    excludeLanguages: SupportedLanguage[];
     characterMap: Record<string, string>;
     whitelist: string[];
     matchMode: MatchMode;
@@ -157,7 +158,10 @@ const matchesBannedWord = (
 export const createBadWordFilter = (
     customConfig?: Partial<FilterConfig>
 ): BadWordFilter => {
-    const languages = customConfig?.languages ?? [...supportedLanguages];
+    const excludedLanguages = new Set(customConfig?.excludeLanguages ?? []);
+    const languages = (
+        customConfig?.languages ?? [...supportedLanguages]
+    ).filter((language) => !excludedLanguages.has(language));
     const languageBanWords = languages.flatMap(
         (language) => banWordsByLanguage[language]
     );
@@ -168,6 +172,7 @@ export const createBadWordFilter = (
     const config: FilterConfig = {
         banWords: [...(customConfig?.banWords ?? languageBanWords)],
         languages: [...languages],
+        excludeLanguages: [...excludedLanguages],
         characterMap,
         whitelist: [...(customConfig?.whitelist ?? [])],
         matchMode: customConfig?.matchMode ?? "exact",

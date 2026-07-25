@@ -87,8 +87,8 @@ Default banned words are stored in separate language dictionaries:
 - `ban-words/en.json`
 - `ban-words/id.json`
 
-All dictionaries are enabled by default. Use `languages` to select only the
-built-in dictionaries you need:
+All dictionaries are enabled by default. Use `languages` as an allowlist to
+select only the languages that should be filtered:
 
 ```typescript
 const indonesianFilter = createBadWordFilter({
@@ -96,9 +96,19 @@ const indonesianFilter = createBadWordFilter({
 });
 ```
 
-Custom `banWords` still replaces the selected built-in dictionaries. The raw
-dictionaries can also be imported from `text-purifier/ban-words/en.json` and
-`text-purifier/ban-words/id.json`.
+Use `excludeLanguages` as a denylist when you want to enable all languages
+except specific ones:
+
+```typescript
+const nonEnglishFilter = createBadWordFilter({
+  excludeLanguages: ["en"]
+});
+```
+
+When both options contain the same language, `excludeLanguages` takes
+precedence. Custom `banWords` still replaces the selected built-in
+dictionaries. The raw dictionaries can also be imported from
+`text-purifier/ban-words/en.json` and `text-purifier/ban-words/id.json`.
 
 Providing `banWords` or `characterMap` replaces the corresponding default
 value for that filter instance. Configuration objects are cloned, so runtime
@@ -143,6 +153,7 @@ Creates an isolated filter. Available configuration:
 
 - `banWords: string[]`
 - `languages: ("en" | "id")[]`
+- `excludeLanguages: ("en" | "id")[]`
 - `characterMap: Record<string, string>`
 - `whitelist: string[]`
 - `matchMode: "exact" | "substring"`
