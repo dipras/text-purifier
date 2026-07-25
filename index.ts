@@ -1,9 +1,16 @@
 import defaultConfig from "./config.json";
+import englishBanWords from "./ban-words/en.json";
+import indonesianBanWords from "./ban-words/id.json";
 
 export type MatchMode = "exact" | "substring";
 
+export const supportedLanguages = ["en", "id"] as const;
+
+export type SupportedLanguage = (typeof supportedLanguages)[number];
+
 export type FilterConfig = {
     banWords: string[];
+    languages: SupportedLanguage[];
     characterMap: Record<string, string>;
     whitelist: string[];
     matchMode: MatchMode;
@@ -44,6 +51,11 @@ type NormalizedToken = {
 const combiningMarks = /[\u0300-\u036f]/g;
 const lettersAndNumbers = /[\p{L}\p{N}]/u;
 const nonWhitespaceToken = /\S+/gu;
+
+const banWordsByLanguage: Record<SupportedLanguage, string[]> = {
+    en: englishBanWords,
+    id: indonesianBanWords,
+};
 
 const normalizeCharacters = (value: string): string =>
     value.toLowerCase().normalize("NFD").replace(combiningMarks, "");
@@ -145,12 +157,17 @@ const matchesBannedWord = (
 export const createBadWordFilter = (
     customConfig?: Partial<FilterConfig>
 ): BadWordFilter => {
+    const languages = customConfig?.languages ?? [...supportedLanguages];
+    const languageBanWords = languages.flatMap(
+        (language) => banWordsByLanguage[language]
+    );
     const characterMap = normalizeCharacterMap(
         customConfig?.characterMap ?? defaultConfig.characterMap
     );
 
     const config: FilterConfig = {
-        banWords: [...(customConfig?.banWords ?? defaultConfig.banWords)],
+        banWords: [...(customConfig?.banWords ?? languageBanWords)],
+        languages: [...languages],
         characterMap,
         whitelist: [...(customConfig?.whitelist ?? [])],
         matchMode: customConfig?.matchMode ?? "exact",

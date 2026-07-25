@@ -47,6 +47,27 @@ describe("createBadWordFilter", () => {
         });
     });
 
+    test("loads all language dictionaries by default", () => {
+        const result = createBadWordFilter().filterText(
+            "anjing bastard",
+            true
+        );
+
+        expect(result.result).toBe("****** *******");
+    });
+
+    test("can load selected language dictionaries", () => {
+        const indonesianFilter = createBadWordFilter({ languages: ["id"] });
+        const englishFilter = createBadWordFilter({ languages: ["en"] });
+
+        expect(
+            indonesianFilter.filterText("anjing bastard", true).result
+        ).toBe("****** bastard");
+        expect(englishFilter.filterText("anjing bastard", true).result).toBe(
+            "anjing *******"
+        );
+    });
+
     test("returns the original clean text", () => {
         expect(createBadWordFilter().filterText("Hello world")).toEqual(
             cleanResult("Hello world")

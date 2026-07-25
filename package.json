@@ -19,7 +19,8 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./config.json": "./config.json"
+    "./config.json": "./config.json",
+    "./ban-words/*.json": "./ban-words/*.json"
   },
   "type": "module",
   "sideEffects": false,
@@ -50,7 +51,8 @@
   "license": "GPL-2.0-only",
   "files": [
     "dist",
-    "config.json"
+    "config.json",
+    "ban-words"
   ],
   "devDependencies": {
     "@rollup/plugin-json": "^6.1.0",
